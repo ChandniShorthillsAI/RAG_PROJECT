@@ -40,10 +40,6 @@
 
 
 
-
-
-
-
 import pandas as pd
 from tqdm import tqdm
 from bert_score import score as bert_score
@@ -60,6 +56,7 @@ df = df.dropna(subset=["answer", "llm_answer"]).reset_index(drop=True)
 
 # Initialize sentence transformer model
 sent_model = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 # Compute BERTScore
 print("🔍 Calculating BERTScore...")
