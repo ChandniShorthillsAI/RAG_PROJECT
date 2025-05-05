@@ -116,7 +116,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 
 # Constants
-INDEX_PATH = "../embeddings/faiss_index"
+INDEX_PATH = "embeddings/faiss_index"
 LOG_DIR = "logs"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3:8b"
@@ -160,6 +160,60 @@ def stream_ollama(prompt):
                 yield token
             except Exception as e:
                 print("JSON parse error:", e)
+
+def get_llm_score(prompt):
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
+        )
+        response.raise_for_status()
+        result = response.json()
+        response_text = result.get("response", "")
+        
+        try:
+            # Find the first occurrence of a JSON object
+            start = response_text.find('{')
+            end = response_text.rfind('}')
+            if start == -1 or end == -1:
+                return {
+                    "correctness": 0.0,
+                    "relevance": 0.0,
+                    "similarity": 0.0,
+                    "context_utilization": 0.0,
+                    "faithfulness": 0.0,
+                    "explanation": "No JSON found"
+                }
+            
+            json_str = response_text[start:end+1]
+            scores = json.loads(json_str)
+            return {
+                "correctness": float(scores.get("correctness", 0.0)),
+                "relevance": float(scores.get("relevance", 0.0)),
+                "similarity": float(scores.get("similarity", 0.0)),
+                "context_utilization": float(scores.get("context_utilization", 0.0)),
+                "faithfulness": float(scores.get("faithfulness", 0.0)),
+                "explanation": scores.get("explanation", "No explanation provided")
+            }
+        except json.JSONDecodeError:
+            return {
+                "correctness": 0.0,
+                "relevance": 0.0,
+                "similarity": 0.0,
+                "context_utilization": 0.0,
+                "faithfulness": 0.0,
+                "explanation": "Invalid JSON"
+            }
+    except Exception as e:
+        print("❌ Error in get_llm_score:", e)
+        return {
+            "correctness": 0.0,
+            "relevance": 0.0,
+            "similarity": 0.0,
+            "context_utilization": 0.0,
+            "faithfulness": 0.0,
+            "explanation": f"Error: {str(e)}"
+        }
 
 # -------------------- Streamlit UI -------------------- #
 

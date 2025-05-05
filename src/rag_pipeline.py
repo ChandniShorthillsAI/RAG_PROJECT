@@ -95,6 +95,21 @@ class RagPipeline:
         chunks = self.load_and_chunk_text()
         self.embed_and_store(chunks)
 
+    def retrieve_context(self, query, k=3):
+        """Retrieve relevant context for a given query.
+        
+        Args:
+            query (str): The query to search for.
+            k (int): Number of documents to retrieve.
+            
+        Returns:
+            str: The concatenated context from the top k documents.
+        """
+        embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en-v1.5")
+        vectorstore = FAISS.load_local(self.index_path, embeddings=embeddings, allow_dangerous_deserialization=True)
+        docs = vectorstore.similarity_search(query, k=k)
+        return "\n\n".join([doc.page_content for doc in docs])
+
 if __name__ == "__main__":
     pipeline = RagPipeline()
     pipeline.run()

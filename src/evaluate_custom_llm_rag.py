@@ -1,125 +1,95 @@
+import os
 import pandas as pd
-from tqdm import tqdm
+from pathlib import Path
 import json
-import ollama
-from concurrent.futures import ThreadPoolExecutor
-import re
+from tqdm import tqdm
+from utils.ui_app import get_llm_score
 
-# Path to your CSV
-csv_path = "../output_files/qa_with_context.csv"
-output_path = "../output_files/custom_llm_rag_eval_gemma.csv"
+# Get the absolute path to the CSV file
+def get_csv_path():
+    current_file = Path(__file__)
+    return current_file.parent.parent / "output_files" / "qa_with_context.csv"
 
-# Load CSV
-df = pd.read_csv(csv_path)
+# Function to load the CSV data
+def load_csv_data():
+    csv_path = get_csv_path()
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV file not found at {csv_path}\nPlease ensure the file exists and try again.")
+    return pd.read_csv(csv_path)
 
-# Define evaluation metrics
-metrics = ["correctness", "relevance", "similarity", "context_utilization", "faithfulness"]
+# Load the CSV data
+try:
+    df = load_csv_data()
+except Exception as e:
+    print(f"Error loading CSV: {e}")
+    df = pd.DataFrame()  # Empty DataFrame for testing
 
-# Truncate helper (faster input, less cost)
-def truncate(text, max_chars=300):
-    return text[:max_chars] + "..." if len(text) > max_chars else text
+def truncate(text, max_chars=100):
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "..."
 
-# Prompt builder
-def build_prompt(question, context, gt_answer, model_answer):
-    return f"""
-You are a helpful evaluator tasked with scoring how well the LLM-generated answer matches the ground truth, uses the context, and stays faithful. Give scores from 0 to 1.
+def build_prompt(question, retrieved_context, answer, llm_answer):
+    return f"""Question: {question}
+Retrieved Context: {retrieved_context}
+Correct Answer: {answer}
+LLM Answer: {llm_answer}
 
-Question: {question}
+Please evaluate the LLM's answer based on the following criteria:
+1. Correctness: How accurate is the answer compared to the correct answer?
+2. Relevance: How relevant is the answer to the question?
+3. Similarity: How similar is the answer to the correct answer?
+4. Context Utilization: How well does the answer use the retrieved context?
+5. Faithfulness: How faithful is the answer to the retrieved context?
 
-Retrieved Context: {context}
-
-Ground Truth Answer: {gt_answer}
-
-LLM Generated Answer: {model_answer}
-
-Return a JSON object with the following fields:
-- correctness
-- relevance
-- similarity
-- context_utilization
-- faithfulness
-- explanation
+Please provide your evaluation in JSON format with scores between 0 and 1 for each criterion, and a brief explanation.
 """
 
-# Function to safely extract JSON from model response
 def extract_json(response_text):
     try:
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
-        else:
-            raise ValueError("No JSON found in response")
-    except Exception as e:
-        print(f"⚠️ JSON parsing failed: {e}")
-        return {
-            "correctness": 0.0,
-            "relevance": 0.0,
-            "similarity": 0.0,
-            "context_utilization": 0.0,
-            "faithfulness": 0.0,
-            "explanation": response_text[:100] or "No output"
-        }
+        # Find the first occurrence of a JSON object
+        start = response_text.find('{')
+        end = response_text.rfind('}')
+        if start == -1 or end == -1:
+            return {"correctness": 0.0, "relevance": 0.0, "similarity": 0.0, 
+                   "context_utilization": 0.0, "faithfulness": 0.0, "explanation": "No JSON found"}
+        
+        json_str = response_text[start:end+1]
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        return {"correctness": 0.0, "relevance": 0.0, "similarity": 0.0, 
+               "context_utilization": 0.0, "faithfulness": 0.0, "explanation": "Invalid JSON"}
 
-# Get scores from gemma:2b via Ollama
-def get_llm_score(prompt):
-    try:
-        response = ollama.chat(model="gemma:2b", messages=[
-            {"role": "system", "content": "You are an evaluation assistant."},
-            {"role": "user", "content": prompt}
-        ])
-        result_text = response["message"]["content"]
-        result = extract_json(result_text)
-        return result
-    except Exception as e:
-        print(f"⚠️ Evaluation failed: {e}")
-        return {
-            "correctness": 0.0,
-            "relevance": 0.0,
-            "similarity": 0.0,
-            "context_utilization": 0.0,
-            "faithfulness": 0.0,
-            "explanation": "Evaluation failed"
-        }
-
-# Evaluate a single row
 def evaluate_row(i, row):
-    # Skip if already evaluated
-    if not pd.isna(row.get("llm_correctness", None)) and row["llm_correctness"] > 0:
+    if 'llm_correctness' in row:
         return i, {}
-
-    prompt = build_prompt(
-        truncate(row["question"]),
-        truncate(row["retrieved_context"]),
-        truncate(row["answer"]),
-        truncate(row["llm_answer"])
-    )
+        
+    question = row['question']
+    retrieved_context = row['retrieved_context']
+    answer = row['answer']
+    llm_answer = row['llm_answer']
+    
+    prompt = build_prompt(question, retrieved_context, answer, llm_answer)
     result = get_llm_score(prompt)
+    
+    return i, {
+        'llm_correctness': result['correctness'],
+        'llm_relevance': result['relevance'],
+        'llm_similarity': result['similarity'],
+        'llm_context_utilization': result['context_utilization'],
+        'llm_faithfulness': result['faithfulness'],
+        'llm_explanation': result['explanation']
+    }
 
-    row_result = {}
-    for key in metrics:
-        row_result[f"llm_{key}"] = result.get(key, 0.0)
-    row_result["llm_explanation"] = result.get("explanation", "")
-    return i, row_result
-
-# Add new columns if not present
-for key in metrics:
-    col = f"llm_{key}"
-    if col not in df.columns:
-        df[col] = 0.0
-if "llm_explanation" not in df.columns:
-    df["llm_explanation"] = ""
-
-# Multithreaded execution
-print("🚀 Starting fast LLM evaluation with gemma:2b...")
-
-with ThreadPoolExecutor(max_workers=6) as executor:  # adjust to your CPU
-    futures = [executor.submit(evaluate_row, i, row) for i, row in df.iterrows()]
-
-    for future in tqdm(futures):
-        i, result = future.result()
-        for key, val in result.items():
-            df.at[i, key] = val
-
-# Save the updated DataFrame
-df.to_csv(output_path, index=False)
-print(f"✅ Evaluation completed. Results saved to: {output_path}")
+if __name__ == "__main__":
+    # Apply evaluation to each row
+    results = []
+    for i, row in tqdm(df.iterrows(), total=len(df)):
+        _, result = evaluate_row(i, row)
+        if result:
+            results.append(result)
+    
+    # Convert results to DataFrame and save
+    results_df = pd.DataFrame(results)
+    output_path = Path(__file__).parent.parent / "output_files" / "qa_score_summary.csv"
+    results_df.to_csv(output_path, index=False)

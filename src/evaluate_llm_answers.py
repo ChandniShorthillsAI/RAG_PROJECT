@@ -49,7 +49,7 @@ from fuzzywuzzy import fuzz
 import numpy as np
 
 # Load the CSV file
-df = pd.read_csv("qa_with_context.csv")
+df = pd.read_csv("../output_files/qa_with_context.csv")
 
 # Filter out rows with empty values
 df = df.dropna(subset=["answer", "llm_answer"]).reset_index(drop=True)
@@ -81,7 +81,7 @@ df["cosine_similarity"] = cosine_diag
 df["fuzzy_score"] = fuzzy_scores
 
 # Save detailed scores
-df.to_csv("qa_with_scores.csv", index=False)
+df.to_csv("..output_files/qa_with_scores.csv", index=False)
 
 # Compute summary
 summary = {
@@ -93,7 +93,7 @@ summary = {
 }
 
 summary_df = pd.DataFrame(summary)
-summary_df.to_csv("qa_score_summary.csv", index=False)
+summary_df.to_csv("../output_files/qa_score_summary.csv", index=False)
 
 # Print summary
 print("\n📊 Evaluation Summary:")
