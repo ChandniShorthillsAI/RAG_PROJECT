@@ -1,7 +1,7 @@
 import unittest
 import sys
 import os
-from test_scraper import TestScraper
+from test_rag_pipeline import TestRagPipeline
 from generate_rtm import update_rtm_status, create_rtm
 
 def run_tests():
@@ -9,7 +9,7 @@ def run_tests():
     create_rtm()
     
     # Create test suite
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestScraper)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestRagPipeline)
     
     # Create test runner
     runner = unittest.TextTestRunner(verbosity=2)
@@ -20,10 +20,10 @@ def run_tests():
     # Update RTM based on test results
     test_methods = [
         'test_clean_text',
-        'test_scrape_wikipedia_page_success',
-        'test_scrape_wikipedia_page_failure',
-        'test_save_data',
-        'test_topics_list'
+        'test_load_and_chunk_text',
+        'test_embed_and_store',
+        'test_retrieve_context',
+        'test_pipeline_initialization'
     ]
     
     for i, test_method in enumerate(test_methods, 1):

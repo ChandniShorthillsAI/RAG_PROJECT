@@ -1,7 +1,7 @@
 import unittest
 import sys
 import os
-from test_scraper import TestScraper
+from test_evaluate_llm_answers import TestEvaluateLLMAnswers
 from generate_rtm import update_rtm_status, create_rtm
 
 def run_tests():
@@ -9,7 +9,7 @@ def run_tests():
     create_rtm()
     
     # Create test suite
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestScraper)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestEvaluateLLMAnswers)
     
     # Create test runner
     runner = unittest.TextTestRunner(verbosity=2)
@@ -19,11 +19,11 @@ def run_tests():
     
     # Update RTM based on test results
     test_methods = [
-        'test_clean_text',
-        'test_scrape_wikipedia_page_success',
-        'test_scrape_wikipedia_page_failure',
-        'test_save_data',
-        'test_topics_list'
+        'test_bert_score_calculation',
+        'test_cosine_similarity_calculation',
+        'test_fuzzy_similarity_calculation',
+        'test_data_loading_and_cleaning',
+        'test_output_file_generation'
     ]
     
     for i, test_method in enumerate(test_methods, 1):

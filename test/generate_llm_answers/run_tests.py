@@ -1,7 +1,7 @@
 import unittest
 import sys
 import os
-from test_scraper import TestScraper
+from test_generate_llm_answers import TestGenerateLLMAnswers
 from generate_rtm import update_rtm_status, create_rtm
 
 def run_tests():
@@ -9,7 +9,7 @@ def run_tests():
     create_rtm()
     
     # Create test suite
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestScraper)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestGenerateLLMAnswers)
     
     # Create test runner
     runner = unittest.TextTestRunner(verbosity=2)
@@ -19,11 +19,10 @@ def run_tests():
     
     # Update RTM based on test results
     test_methods = [
-        'test_clean_text',
-        'test_scrape_wikipedia_page_success',
-        'test_scrape_wikipedia_page_failure',
-        'test_save_data',
-        'test_topics_list'
+        'test_stream_ollama',
+        'test_get_done_questions',
+        'test_append_to_csv',
+        'test_generate_llm_answers'
     ]
     
     for i, test_method in enumerate(test_methods, 1):
@@ -46,6 +45,13 @@ def run_tests():
             
         status, actual_result, comments = test_result
         update_rtm_status(test_id, status, actual_result, comments)
+    
+    # Print summary
+    print("\n📊 Test Summary:")
+    print(f"Tests run: {result.testsRun}")
+    print(f"Failures: {len(result.failures)}")
+    print(f"Errors: {len(result.errors)}")
+    print(f"Success: {result.testsRun - len(result.failures) - len(result.errors)}")
 
 if __name__ == '__main__':
     run_tests() 
