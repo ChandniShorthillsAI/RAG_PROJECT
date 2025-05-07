@@ -116,7 +116,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from sentence_transformers import CrossEncoder
 
 # Constants
-INDEX_PATH = "embeddings/faiss_index"
+INDEX_PATH = "../embeddings/faiss_index"
 LOG_DIR = "logs"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3:8b"
